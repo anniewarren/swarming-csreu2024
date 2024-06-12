@@ -4,7 +4,7 @@
 close all;clear all;
 %%%%%%%%%% numerical parameters %%%%%%%%%%%%%%%%%%%
 dt = .003; % time stepping
-n=1024; % number of FOurier modes, best 2^N
+n=256; % number of FOurier modes, best 2^N
 
 eps=0.01;%artificial viscosity; small eps requires small dt
 eps1=0.1; % smoothing of dirac conv kernel
@@ -13,8 +13,9 @@ eps1=0.1; % smoothing of dirac conv kernel
 
 %%%%%%%%%%%% system parameters %%%%%%%%%%%%%%%%%%
 L = pi; % domain size
-xgrid = linspace(-L, L, n)';
-mu=0.4;% bifurcation parameter, instability roughly at mu=1/pi instability
+%xgrid = linspace(-L, L, n)';
+xgrid = linspace(-L,L,n+1)';xgrid=xgrid(1:end-1);
+mu=0.4;% bifurcation parameter, instability roughly at mu=1/pi~0.318 
 
 
 %%%%%%%%%%%%%%%%%% convolution and derivative vectors%%%%%%%%%
