@@ -2,30 +2,28 @@
 
 close all;clear all;
 %%%%%%%%%% numerical parameters %%%%%%%%%%%%%%%%%%%
-dt = .003; % time stepping
-n=512; % number of FOurier modes, best 2^N
+dt = .003; % time step
+n=512; % number of Fourier modes, best 2^N
 
-eps=0.01;%artificial viscosity; small eps requires small dt
+eps=0.01; % artificial viscosity; small eps requires small dt (amw-?)
 epsilon=eps; % smoothing of dirac conv kernel
 
-
-
 %%%%%%%%%%%% system parameters %%%%%%%%%%%%%%%%%%
-L = pi; % domain size
-xgrid = linspace(-L, L, n)';
-mu=0.1;% bifurcation parameter, instability roughly at mu=0instability
+P = 2*pi; % domain size
+xgrid = linspace(0, P, n)';
+mu=0.1;% bifurcation parameter, instability at mu=1/pi^2
 
 
 %%%%%%%%%%%%%%%%%% convolution and derivative vectors%%%%%%%%%
-k = [[0:n/2] [-n/2+1: -1]]';
+k = [[0:n/2] [-n/2+1: -1]];
 k2 = k.^2; % not used here
 % define various convolution kernels
 cosconv=zeros(n,1);
-cosconv(2)=1/2;
-cosconv(end)=1/2; % this is the cosine kernel
+%cosconv(2)=1/2;
+%cosconv(end)=1/2; % this is the cosine kernel
 delconv=ones(n,1);
 delconv=1./(1+epsilon*k.^2); %this is a smoothed version of the Dirac delta -- more modes if eps1 is small!
-kon=1i*k.*(delconv -(2+mu)*cosconv); % putting the kernels together
+kon=1i*k.*(delconv -(2+mu)*cosconv); % v'= d -mucosx (ik*(dk-mu*ck) putting the kernels together
 visc = [1+dt*eps*k2]; % artificial viscosity
 
 %%%%%%%%%%% %  initial shape %%%%%%%%%%%%%%%%%%%%%%%%
@@ -39,7 +37,7 @@ uf = fft(u);
 t_max=50000;
 t_plot=1;
 t=0;
-h=figure(17);
+h=figure(Name='Simulation');
 
 while t < t_max
     t = t+dt;
