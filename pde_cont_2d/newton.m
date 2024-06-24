@@ -7,7 +7,7 @@ function [uvec,newtonflag] = newton(uvec,u0vec,duvec,tangentvec,Vhat,D1x,D1y,lap
 
     nrhs=F(uvec);           % compute residual
     nresidual=norm(nrhs);   % estimate residual
-    disp(['residual ' num2str(nresidual)])
+    %disp(['residual ' num2str(nresidual)])
     %pause
 
     newtonflag.error=0;

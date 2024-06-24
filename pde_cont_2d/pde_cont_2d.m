@@ -1,6 +1,7 @@
+
 % set up parameters
 n=128;% discretization size
-eps=0.01; % regularizing viscosity- smaller eps requires larger n
+eps=0.005; % regularizing viscosity- smaller eps requires larger n ~ 1/sqrt(eps)
 ds=1e-1; % secant step size
 M =1; % size of domain in units of 2pi
 L = M*pi; 
@@ -63,7 +64,13 @@ tangentvec=uvec-uoldvec;tangentvec=tangentvec/norm(tangentvec);
 
 mu_list=[];
 inf_list=[];
+vac_list=[];
+l_list=[];
 h=figure(1);
+w=waitbar(0,'forming vacuum...')
+
+vac_pts = 0;
+vac_pts_max = 12
 
 contsteps = 1000;
 
@@ -87,15 +94,29 @@ for contcount=1:contsteps
         tangentvec=uvec-uoldvec;tangentvec=tangentvec/norm(tangentvec);
         set(0,'CurrentFigure',h)
             u = reshape(uvec(1:end-4),n,n);
-            surf(x,y,u);
+            surf(x,y,u,LineStyle="none");
             title(['$\mu=$' num2str(uvec(end)) ', $|u|_\infty$=' num2str(norm(uvec(1:end-4),'inf')) ' $ds=$' num2str(ds)],'interpreter','latex')
-            axis([-pi pi -pi pi 0.01 2.5])
+            axis([-pi pi -pi pi 0.001 2.5])
             xlabel('x')
             ylabel('y')
             zlabel('u')
             drawnow
         mu_list=[mu_list;uvec(end)];
         inf_list=[inf_list;norm(uvec(1:end-4),'inf')];
+
+        % calculate size of vacuum
+        cutoff = 0.001;
+        vacuum = uvec(1:end-4) < cutoff;
+        vacuum_size = sum(vacuum)*4*pi*pi/(n*n);
+        if vacuum_size > 0
+            vac_pts = vac_pts+1;
+            waitbar(vac_pts/vac_pts_max,w,'taking vacuum data...')
+        end
+        vac_radius = sqrt(vacuum_size/(2*pi));
+        disp(['vacuum size...' num2str(vacuum_size)])
+        vac_list = [vac_list;vacuum_size];
+        l_list = [l_list;vac_radius];
+
         if newtonflag.iter >5
             ds=ds/2; % decrease step size if newton not converging
         end
@@ -107,9 +128,23 @@ for contcount=1:contsteps
         %display("reached breakpoint")
         %break
     %end
+    if vac_pts == vac_pts_max
+        break
+    end
 end
 
 figure(33)
 plot(mu_list,inf_list,'.-')
 xlabel(['$\mu$'],'Interpreter','latex')
 ylabel(['$|u|_\infty$'],'Interpreter','latex')
+
+
+figure(34)
+plot(mu_list,l_list,'.-')
+xlabel(['$\mu$'],'Interpreter','latex')
+ylabel('l')
+hold on
+mu_list_pred = linspace(1/(pi*pi),max(mu_list),512);
+prediction = nthroot(2*pi*pi*pi*(mu_list_pred-1/(pi*pi)),4);
+plot(mu_list_pred,prediction,'.-')
+axis([0.1013 max(mu_list)+0.0001 0 max([max(l_list) max(prediction)+0.05])])
