@@ -1,4 +1,4 @@
-function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,verbose,contsteps)
+function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,verbose)
     % set up parameters
     n=nfouriermodes;% discretization size
     eps=epsilon; % regularizing viscosity- smaller eps requires larger n ~ 1/sqrt(eps)
@@ -7,6 +7,8 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
     L = M*pi; 
     x = linspace(-L, L, n+1)'; x=x(1:end-1); %n points total, end is periodic point
     y = linspace(-L,L,n+1);y=y(1:end-1);
+    contsteps = 100000;
+    plotting = false;
     %dx=2*L/n; 
     %dy=2*L/n;
     
@@ -25,7 +27,7 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
     
     %initial conditions
     uinit = 1+9e-1*cos(x)*cos(y); % initial shape
-    mu=0.1013+eps; % mu bifurcation parameter
+    mu=0.1013; % mu bifurcation parameter
     sx=0; % s for drift (compensating for extra phase condition), in x and y
     sy=0; 
     alpha=0; % alpha for mass loss 
@@ -47,23 +49,23 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
     %contsteps = 1000;
     
     %% GPU data transfers %%
-    % n = gpuArray(n);
-    % eps = gpuArray(eps);
-    % D1x = gpuArray(D1x);
-    % D1y = gpuArray(D1y);
-    % laplace = gpuArray(laplace);
-    % Vhat = gpuArray(Vhat);
-    % uvec = gpuArray(uvec);
-    % tangentvec = gpuArray(tangentvec);
-    % ntol = gpuArray(ntol);
-    % ngmrestol = gpuArray(ngmrestol);
-    % nnitermax = gpuArray(nnitermax);
-    % nminstep = gpuArray(nminstep);
-    % cutoff = gpuArray(cutoff);
-    % contsteps = gpuArray(contsteps);
-    % errorsinarow = zeros(1,1,"gpuArray");
-    % mu_list = zeros(1,contsteps,"gpuArray");
-    % vac_list = zeros(1,contsteps,"gpuArray");
+    n = gpuArray(n);
+    eps = gpuArray(eps);
+    D1x = gpuArray(D1x);
+    D1y = gpuArray(D1y);
+    laplace = gpuArray(laplace);
+    Vhat = gpuArray(Vhat);
+    uvec = gpuArray(uvec);
+    tangentvec = gpuArray(tangentvec);
+    ntol = gpuArray(ntol);
+    ngmrestol = gpuArray(ngmrestol);
+    nnitermax = gpuArray(nnitermax);
+    nminstep = gpuArray(nminstep);
+    cutoff = gpuArray(cutoff);
+    %contsteps = gpuArray(contsteps);
+    errorsinarow = zeros(1,1,"gpuArray");
+    mu_list = zeros(1,contsteps,"gpuArray");
+    vac_list = zeros(1,contsteps,"gpuArray");
     
     % preconditioner for gmres
     pc= @(duvec) [reshape(ifft2(fft2(reshape(duvec(1:end-4),n,n))./(laplace-1),'symmetric'),n*n,1);duvec(end-3:end)]; % preconditioner
@@ -93,9 +95,11 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
     % vac_pts = 0;
     % vac_pts_max = 12;
     
+    vacuum_size = 0;
+
     %start secant continuation
     vactrue = 'f';
-    fprintf(['computing iteration ' num2str(1,'%04u') ' of ' num2str(contsteps,'%04u') '... mu=' num2str(uvec(end),'%06.5f') ' umax=' num2str(norm(uvec(1:end-4),'inf'),'%06.5f') ' (vac: ' vactrue ')'])
+    fprintf(['computing iteration... mu=' num2str(uvec(end),'%06.5f') ' umax=' num2str(norm(uvec(1:end-4),'inf'),'%06.5f') ' (vac: ' num2str(vacuum_size,'%06.3f') ')'])
     for contcount=1:contsteps
         uoldvec=uvec;
         u0vec=uoldvec+ds*tangentvec;
@@ -121,7 +125,8 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
 		        %disp(['mu=' num2str(uvec(end)) ' umax=' num2str(norm(uvec(1:end-4),'inf'))])
             end
             tangentvec=uvec-uoldvec;tangentvec=tangentvec/norm(tangentvec);
-            set(0,'CurrentFigure',h)
+            if plotting
+		set(0,'CurrentFigure',h)
                 u = reshape(uvec(1:end-4),n,n);
                 surf(x,y,u,LineStyle="none");
                 title(['$\mu=$' num2str(uvec(end)) ', $|u|_\infty$=' num2str(norm(uvec(1:end-4),'inf')) ' $ds=$' num2str(ds) ' a=' num2str(sum(uvec(1:end-4)))],'interpreter','latex')
@@ -130,6 +135,7 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
                 ylabel('y')
                 zlabel('u')
                 drawnow
+	    end
             mu_list(contcount) = uvec(end);
             % inf_list(contcount) = norm(uvec(1:end-4),'inf');
     
@@ -138,8 +144,8 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
             vacuum = uvec(1:end-4) < cutoff;
             vacuum_size = sum(vacuum)*4*pi*pi/(n*n);
             if vacuum_size > 0
-		        disp(['vacuum reached after ' num2str(contcount) ' iterations'])    
-		        break
+		        %disp(['vacuum reached after ' num2str(contcount) ' iterations'])    
+		        %break
                 vactrue = 't';
             %     vac_pts = vac_pts+1;
             %     waitbar(vac_pts/vac_pts_max,w,'taking vacuum data...')
@@ -151,7 +157,7 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
             vac_list(contcount) = vacuum_size;
             %l_list = [l_list;vac_radius];
             
-            fprintf(['\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b' num2str(contcount+1,'%04u') ' of ' num2str(contsteps,'%04u') '... mu=' num2str(uvec(end),'%06.5f') ' umax=' num2str(norm(uvec(1:end-4),'inf'),'%06.5f') ' (vac: ' vactrue ')'])
+            fprintf(['\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b' num2str(uvec(end),'%06.5f') ' umax=' num2str(norm(uvec(1:end-4),'inf'),'%06.5f') ' (vac: ' num2str(vacuum_size,'%06.3f') ')'])
             if newtonflag.iter >5
                 ds=ds/2; % decrease step size if newton not converging
             end
@@ -159,16 +165,16 @@ function [mu_list_out, vac_list_out] = gpu_pde_cont_2d(nfouriermodes,epsilon,ver
                 ds=min(1,ds*1.2); % increase stepsize if newton performing well
             end
         end
-        % if max(u(1:end-3))>2.3
-        %     display("reached breakpoint")
-        %     break
-        % end
+        if vacuum_size > 10
+            disp("reached breakpoint")
+            break
+        end
         % if vac_pts == vac_pts_max
         %     break
         % end
     end
-    mu_list_out = mu_list %gather(mu_list);
-    vac_list_out = vac_list %gather(vac_list);
+    mu_list_out = gather(mu_list);
+    vac_list_out = gather(vac_list);
 end
 
 % figure(33)
