@@ -1,20 +1,20 @@
-function [uvec,newtonflag] = newton(uvec,u0vec,duvec,tangentvec,Vhat,D1x1,D1x2,laplace,eps,n,ntol,ngmrestol,pc,nnitermax,nminstep)
+function [uvec,newtonflag] = newton(uvec,u0vec,duvec,tangentvec,Vhat,D1y1,D1y2,laplace,eps,n,ntol,ngmrestol,pc,nnitermax,nminstep)
     %paramters for gmres
     restart = 200;
     ngmresitermax = 25;
 
-    F = @(uvec) funk(uvec,u0vec,tangentvec,Vhat,D1x1,D1x2,laplace,eps,n);
+    F = @(uvec) funk(uvec,u0vec,tangentvec,Vhat,D1y1,D1y2,laplace,eps,n);
 
     nrhs=F(uvec);           % compute residual
     %figure(12)
     %stem(nrhs);  
     nresidual=norm(nrhs);   % estimate residual
-    disp(['residual ' num2str(nresidual)])
+    %disp(['residual ' num2str(nresidual)])
 
     newtonflag.error=0;
     iter=0;
     while nresidual>ntol
-        dF = @(duvec) jack(duvec,uvec,u0vec,tangentvec,D1x1,D1x2,laplace,eps,Vhat,n);
+        dF = @(duvec) jack(duvec,uvec,u0vec,tangentvec,D1y1,D1y2,laplace,eps,Vhat,n);
         [nnincr,flag]=gmres(dF,nrhs,restart,ngmrestol,ngmresitermax,pc);
         if flag==1
             sprintf(['gmres did not converge, residual is ' num2str(nresidual) ' after ' num2str(iter) ' iterations'])
