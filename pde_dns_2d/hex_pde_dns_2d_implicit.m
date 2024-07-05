@@ -6,8 +6,9 @@ dt = 0.01; % time step
 n = 128; % number of Fourier modes, best 2^N
 iterations = 5000000;
 plotintervals = 5*dt;
-threshold = 0.1;
-mu = 1/(sqrt(3)*pi*pi)-0.0075; % bifurcation parameter, instability roughly at 
+threshold = 0.1; % cutoff for plotting vacuum
+mu = 1/(sqrt(3)*pi*pi)-0.0075; % bifurcation parameter, instability roughly at 1/sqrt(3)pi^2
+epsilon=1e-3; % artificial viscosity; small eps requires small dt
 
 
 %%%%%%%%%%%% system parameters %%%%%%%%%%%%%%%%%%
@@ -47,23 +48,16 @@ l = repmat([0:n/2 -n/2+1:-1],n,1); % y fourier indices as a matrix
 neglaplace = (4/3)*(k.^2 + k.*l + l.^2);
 dy1 = 1i*k;
 dy2 = 1i*l;
-% define fourier coefficients of potential in square
+% define potential in hexagon
 vphys = cos(Y1)+cos(Y2)+cos(Y1-Y2);
-v = fft2(vphys);
-
-% v=zeros(n,n); 
-% v(2,2)=(n*n)/4;
-% v(2,n)=(n*n)/4;
-% v(n,2)=(n*n)/4;
-% v(n,n)=(n*n)/4; % cos(x)cos(y) fourier coefficients
+v = fft2(vphys)*(2*pi*sqrt(3)*pi)/(n*n);
     
 %%%%%%%%%%% %  initial shape %%%%%%%%%%%%%%%%%%%%%%%%
 u0=1; %initial concentration
 %u = u0*ones(n,n)+0.1*(randn(n,n));
 %u=u.*((n*n)/sum(sum(u))); %random perturbation preserving average
-%u = u0*ones(n,n)+0.7*sin(xgrid)*sin(ygrid); %sine perturbation
 
-u = u0*ones(n,n)+0.1*(cos(Y1)+cos(Y2)+cos(Y1-Y2));
+u = u0*ones(n,n)+1*(0.3*cos(Y1)+0.3*cos(Y2)+0.7*cos(Y1-Y2)); % different coefficients for the cos terms introduces asymmetry
 u=u.*((n*n)/sum(sum(u))); %preserving average
 uf = fft2(u);
 
@@ -80,36 +74,34 @@ while t < t_max
     
     if mod(t,plotintervals)<dt % only plot at intervals of t_plot
         set(0,'CurrentFigure',h)
-        parulaedited = [1 1 1;parula];
-        
-
-        subplot(2,1,1)
-        surf(X1,X2,u,EdgeColor="none"); %3D surface plot
-        view(2);
+        %subplot(2,1,1)
+        %surf(X1,X2,u,EdgeColor="none"); %3D surface plot
+        %view(2);
         title(['Swarming, t = ' num2str(t) ', max(u)=' num2str(max(max(u))), ', mass=' num2str(sum(sum(u)))]);
-        axis([upperLeftbound(1) lowerRightbound(1) ylowlim yuplim 0.1 6])
-        daspect([1 1 1])
-        clim([0.1,6]);
-        colorbar;
+        %axis([upperLeftbound(1) lowerRightbound(1) ylowlim yuplim 0.1 6])
+        %daspect([1 1 1])
+        %clim([0.1,6]);
+        %colorbar;
 
-        subplot(2,1,2)
+        %subplot(2,1,2)
         surf(X1,X2,u,EdgeColor="none"); %3D surface plot
-        axis([upperLeftbound(1) lowerRightbound(1) ylowlim yuplim 0.1 6])
-        daspect([1 1 1])
-        clim([0.1,6]);
-        colorbar;
+        axis([upperLeftbound(1) lowerRightbound(1) ylowlim yuplim 0.1 3])
+        title(['Swarming, t = ' num2str(t) ', max(u)=' num2str(max(max(u))), ', mass=' num2str(sum(sum(u)))]);
+        daspect([1 1 0.8])
+        %clim([0.1,6]);
+        %colorbar;
         drawnow;
-        %saveas(gcf,['swarmpics/n' num2str(n) '_mu' sprintf('%.4f', mu) '_iter' sprintf('%04d',iter) '.jpg']);
+        %saveas(gcf,['hexfissures/n' num2str(n) '_mu' sprintf('%.4f', mu) '_iter' sprintf('%04d',iter) '.jpg']);
         iter = iter + 1;
     end
     
     % now the actual time stepping, all the work done here
-    xcom = fft2(u.*ifft2(dy1.*(v.*uf.*(4*pi*pi/(n*n))),'symmetric'));
-    ycom = fft2(u.*ifft2(((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*(v.*uf.*(4*pi*pi/(n*n))),'symmetric'));
-    F = fft2(-1*mu*ifft2(dy1.*xcom + ((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*ycom,'symmetric'));
+    x1com = fft2(u.*ifft2(dy1.*(v.*uf.*(4*pi*pi/(n*n))),'symmetric'));
+    x2com = fft2(u.*ifft2(((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*(v.*uf.*(4*pi*pi/(n*n))),'symmetric'));
+    F = fft2(-1*mu*ifft2(dy1.*x1com + ((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*x2com,'symmetric'));
     Fvec = reshape(F,n*n,1);
 
-    D0 =@(w) w - dt.*D(w,uf,n,dy1,dy2); %takes in a vector w, returns a vector
+    D0 =@(w) w - dt.*D(w,uf,n,dy1,dy2,epsilon); %takes in a vector w, returns a vector
     
     M =@(v) spdiags(reshape((ones(n,n) + dt.*neglaplace).^(-1),n*n,1),0,n*n,n*n)*v; % precondition matrix
     
@@ -130,13 +122,12 @@ end
 
 % takes in un as an nxn matrix, un1 an n^2 column vector both in fourier space 
 % outputs an n^2 column vector in fourier space
-function f = D(un1vec,un,n,dy1,dy2) 
-    epsilon=1e-6; % artificial viscosity; small eps requires small dt
+function f = D(un1vec,un,n,dy1,dy2,epsilon) 
     % dy1 = dy1;
     % dy2 = ((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2);
     un1 = reshape(un1vec,n,n);
-    y1com = fft2((ifft2(un,'symmetric')+epsilon.*ones(n,n)).*ifft2(dy1.*un1, 'symmetric'));
-    y2com = fft2((ifft2(un,'symmetric')+epsilon.*ones(n,n)).*ifft2(((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*un1, 'symmetric'));
-    fmatrix = dy1.*y1com + ((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*y2com;
+    x1com = fft2((ifft2(un,'symmetric')+epsilon.*ones(n,n)).*ifft2(dy1.*un1, 'symmetric'));
+    x2com = fft2((ifft2(un,'symmetric')+epsilon.*ones(n,n)).*ifft2(((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*un1, 'symmetric'));
+    fmatrix = dy1.*x1com + ((1/sqrt(3))*dy1 + (2/sqrt(3))*dy2).*x2com;
     f = reshape(fmatrix,n*n,1);
 end
