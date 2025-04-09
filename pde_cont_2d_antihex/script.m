@@ -14,7 +14,7 @@ for i = 1:length(runs)
     eval([mu_list_name '= mu_list_out;']);
     eval([vac_list_name '= vac_list_out;']);
     if runs(i,1) == 1
-        save("C:\Users\amwar\swarming\figures\antihex_vac_scaling_test.mat",mu_list_name,vac_list_name);
+        save("C:\Users\amwar\swarming\figures\antihex_vac_scaling.mat",mu_list_name,vac_list_name);
         %save("/export/scratch/amwarscratch/hex_vac_scaling",mu_list_name,vac_list_name);
     else
         save("C:\Users\amwar\swarming\figures\antihex_vac_scaling.mat",mu_list_name,vac_list_name,"-append");
