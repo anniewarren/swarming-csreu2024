@@ -1,4 +1,4 @@
-function [mu_list_out,vac_list_out] = pde_cont_2d_hex_run(nFouriermodes,epsilon,verbose,plotting,gpuON)
+function [mu_list_out,vac_list_out] = pde_cont_2d_antihex_run(nFouriermodes,epsilon,verbose,plotting,gpuON)
     %verbose = true;
     %plotting = true;
     %gpuON = false;
